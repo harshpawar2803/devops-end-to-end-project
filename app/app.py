@@ -5,8 +5,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
-        self.wfile.write(b"Hello DevOps - Version 1")
+        self.wfile.write(b"Hello DevOps - Version 2")
 
 server = HTTPServer(("0.0.0.0", 8080), Handler)
-print("Server running on port 8080")
+print("Server running on port 8080 - Version 2")
 server.serve_forever()
