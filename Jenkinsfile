@@ -193,9 +193,86 @@ pipeline {
 
                     echo ""
 
+                    echo "Checking running container..."
+
+                    docker ps --filter name=devops-app-jenkins
+
+                    echo ""
+
+                    echo "Checking deployed image..."
+
+                    docker inspect devops-app-jenkins \
+                        --format '{{.Config.Image}}'
+
+                    echo ""
+
                     echo "======================================"
                     echo "  APPLICATION DEPLOYMENT SUCCESSFUL"
                     echo "======================================"
+                '''
+            }
+        }
+
+        stage('Docker Image Cleanup') {
+            steps {
+                sh '''
+                    echo "======================================"
+                    echo "        DOCKER IMAGE CLEANUP"
+                    echo "======================================"
+
+                    echo "Currently deployed image:"
+
+                    CURRENT_IMAGE=$(docker inspect devops-app-jenkins \
+                        --format '{{.Config.Image}}')
+
+                    echo "$CURRENT_IMAGE"
+
+                    echo "======================================"
+                    echo "Keeping latest 5 numbered images"
+                    echo "and the currently deployed image."
+                    echo "======================================"
+
+                    docker images ${IMAGE_NAME} \
+                        --format '{{.Tag}}' \
+                        | grep -E '^[0-9]+$' \
+                        | sort -nr \
+                        | tail -n +6 \
+                        | while read TAG
+                    do
+
+                        if [ -n "$TAG" ]; then
+
+                            IMAGE="${IMAGE_NAME}:${TAG}"
+
+                            if [ "$IMAGE" = "$CURRENT_IMAGE" ]; then
+
+                                echo "Keeping currently deployed image:"
+                                echo "$IMAGE"
+
+                            else
+
+                                echo "Removing old image:"
+                                echo "$IMAGE"
+
+                                docker rmi "$IMAGE" || true
+
+                            fi
+
+                        fi
+
+                    done
+
+                    echo "======================================"
+                    echo "Remaining Application Images"
+                    echo "======================================"
+
+                    docker images ${IMAGE_NAME}
+
+                    echo "======================================"
+                    echo "Docker Disk Usage"
+                    echo "======================================"
+
+                    docker system df
                 '''
             }
         }
@@ -211,7 +288,7 @@ pipeline {
             echo "Deployment Mode:"
             echo "${DEPLOY_MODE}"
 
-            echo "Docker Image:"
+            echo "Build Image:"
             echo "${IMAGE_NAME}:${IMAGE_TAG}"
 
             echo "Application:"
