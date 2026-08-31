@@ -8,5 +8,6 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b"Hello DevOps - Version 5")
 
 server = HTTPServer(("0.0.0.0", 8080), Handler)
+print("DevOps CI/CD Pipeline")
 print("Server running on port 8080 - Version 5")
 server.serve_forever()
