@@ -68,7 +68,6 @@ pipeline {
 
         stage('Docker Hub Login') {
             steps {
-
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub-creds',
@@ -113,8 +112,6 @@ pipeline {
                     echo "        DOCKER LOGOUT"
                     echo "======================================"
 
-                    echo "Logging out from Docker Hub..."
-
                     docker logout
 
                     echo "Docker logout successful."
@@ -149,6 +146,13 @@ pipeline {
                     echo "Image to Deploy:"
                     echo "${IMAGE_NAME}:${DEPLOY_TAG}"
                     echo "======================================"
+
+                    echo "Checking Docker image..."
+
+                    docker image inspect \
+                        ${IMAGE_NAME}:${DEPLOY_TAG} > /dev/null
+
+                    echo "Docker image found."
 
                     echo "Stopping old container..."
 
@@ -229,6 +233,9 @@ pipeline {
 
             echo "Build Number:"
             echo "${BUILD_NUMBER}"
+
+            echo "Deployment Mode:"
+            echo "${DEPLOY_MODE}"
         }
     }
 }
