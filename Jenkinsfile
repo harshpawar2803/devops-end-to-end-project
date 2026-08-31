@@ -20,8 +20,6 @@ pipeline {
     environment {
         IMAGE_NAME = "harshpawar2803/devops-app"
         IMAGE_TAG  = "${BUILD_NUMBER}"
-        TEST_CONTAINER = "devops-app-test"
-        DEPLOY_CONTAINER = "devops-app-jenkins"
     }
 
     stages {
@@ -45,15 +43,6 @@ pipeline {
                     echo "Docker:"
                     docker --version
 
-                    echo "Docker Compose:"
-                    docker compose version 2>/dev/null || true
-
-                    echo "Build Number:"
-                    echo "${BUILD_NUMBER}"
-
-                    echo "Deployment Mode:"
-                    echo "${DEPLOY_MODE}"
-
                     echo "Image:"
                     echo "${IMAGE_NAME}:${IMAGE_TAG}"
                 '''
@@ -67,109 +56,74 @@ pipeline {
                     echo "        BUILD DOCKER IMAGE"
                     echo "======================================"
 
-                    echo "Building:"
-                    echo "${IMAGE_NAME}:${IMAGE_TAG}"
+                    echo "Building Docker image..."
 
                     docker build \
                         -t ${IMAGE_NAME}:${IMAGE_TAG} .
 
                     echo "Docker image built successfully."
 
-                    echo "======================================"
-                    echo "        BUILT IMAGE DETAILS"
-                    echo "======================================"
+                    echo "Checking image..."
+
+                    docker image inspect \
+                        ${IMAGE_NAME}:${IMAGE_TAG} > /dev/null
+
+                    echo "Docker image verification successful."
 
                     docker images ${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
         }
 
-        stage('Test Docker Image') {
+        stage('Test Application') {
             steps {
                 sh '''
                     echo "======================================"
-                    echo "        TEST DOCKER IMAGE"
+                    echo "        TEST APPLICATION"
                     echo "======================================"
 
-                    echo "Test Image:"
-                    echo "${IMAGE_NAME}:${IMAGE_TAG}"
+                    echo "Starting temporary test container..."
 
-                    echo "Removing old test container if present..."
-
-                    docker rm -f ${TEST_CONTAINER} 2>/dev/null || true
-
-                    echo "Starting test container..."
+                    docker rm -f devops-app-test 2>/dev/null || true
 
                     docker run -d \
-                        --name ${TEST_CONTAINER} \
+                        --name devops-app-test \
                         -p 8096:8080 \
                         ${IMAGE_NAME}:${IMAGE_TAG}
 
                     echo "Test container started."
 
-                    echo "Waiting for application to start..."
+                    echo "Waiting for application..."
 
                     sleep 5
 
-                    echo "======================================"
-                    echo "        CONTAINER STATUS"
-                    echo "======================================"
+                    echo "Checking test container..."
 
-                    docker ps --filter name=${TEST_CONTAINER}
+                    docker ps --filter name=devops-app-test
 
-                    echo "======================================"
-                    echo "        APPLICATION TEST"
-                    echo "======================================"
-
-                    echo "Testing:"
-                    echo "http://localhost:8096"
+                    echo "Testing application endpoint..."
 
                     curl -f http://localhost:8096
 
                     echo ""
 
-                    echo "Application response received successfully."
+                    echo "Application test PASSED."
+
+                    echo "Removing temporary test container..."
+
+                    docker rm -f devops-app-test
+
+                    echo "Test container removed."
 
                     echo "======================================"
-                    echo "        CONTAINER LOGS"
-                    echo "======================================"
-
-                    docker logs ${TEST_CONTAINER}
-
-                    echo "======================================"
-                    echo "        CLEANING TEST CONTAINER"
-                    echo "======================================"
-
-                    docker rm -f ${TEST_CONTAINER}
-
-                    echo "======================================"
-                    echo "       TEST PASSED SUCCESSFULLY"
+                    echo "        TEST SUCCESSFUL"
                     echo "======================================"
                 '''
-            }
-
-            post {
-                failure {
-                    sh '''
-                        echo "======================================"
-                        echo "        TEST FAILED"
-                        echo "======================================"
-
-                        echo "Test container logs:"
-
-                        docker logs ${TEST_CONTAINER} 2>/dev/null || true
-
-                        echo "Removing failed test container..."
-
-                        docker rm -f ${TEST_CONTAINER} 2>/dev/null || true
-                    '''
-                }
             }
         }
 
         stage('Docker Hub Login') {
             steps {
-
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub-creds',
@@ -206,10 +160,6 @@ pipeline {
                     docker push ${IMAGE_NAME}:${IMAGE_TAG}
 
                     echo "Docker image pushed successfully."
-
-                    echo "======================================"
-                    echo "        IMAGE PUSH COMPLETE"
-                    echo "======================================"
                 '''
             }
         }
@@ -220,8 +170,6 @@ pipeline {
                     echo "======================================"
                     echo "        DOCKER LOGOUT"
                     echo "======================================"
-
-                    echo "Logging out from Docker Hub..."
 
                     docker logout
 
@@ -254,48 +202,35 @@ pipeline {
                     fi
 
                     echo "======================================"
-                    echo "        IMAGE TO DEPLOY"
-                    echo "======================================"
-
+                    echo "Image to Deploy:"
                     echo "${IMAGE_NAME}:${DEPLOY_TAG}"
+                    echo "======================================"
 
-                    echo "======================================"
-                    echo "        CHECKING DOCKER IMAGE"
-                    echo "======================================"
+                    echo "Checking Docker image..."
 
                     docker image inspect \
                         ${IMAGE_NAME}:${DEPLOY_TAG} > /dev/null
 
                     echo "Docker image found."
 
-                    echo "======================================"
-                    echo "        STOPPING OLD CONTAINER"
-                    echo "======================================"
+                    echo "Stopping old container..."
 
-                    docker rm -f ${DEPLOY_CONTAINER} 2>/dev/null || true
+                    docker rm -f devops-app-jenkins 2>/dev/null || true
 
-                    echo "Old container removed."
-
-                    echo "======================================"
-                    echo "        STARTING NEW CONTAINER"
-                    echo "======================================"
+                    echo "Starting new container..."
 
                     docker run -d \
-                        --name ${DEPLOY_CONTAINER} \
+                        --name devops-app-jenkins \
                         -p 8095:8080 \
                         ${IMAGE_NAME}:${DEPLOY_TAG}
 
                     echo "Container started."
 
                     echo "======================================"
-                    echo "        RUNNING CONTAINER"
+                    echo "Running Container:"
                     echo "======================================"
 
-                    docker ps --filter name=${DEPLOY_CONTAINER}
-
-                    echo "======================================"
-                    echo "        DEPLOYMENT COMPLETE"
-                    echo "======================================"
+                    docker ps --filter name=devops-app-jenkins
                 '''
             }
         }
@@ -311,31 +246,24 @@ pipeline {
 
                     sleep 5
 
-                    echo "======================================"
-                    echo "        CONTAINER STATUS"
-                    echo "======================================"
-
-                    docker ps --filter name=${DEPLOY_CONTAINER}
-
-                    echo "======================================"
-                    echo "        APPLICATION TEST"
-                    echo "======================================"
-
-                    echo "Testing:"
-                    echo "http://localhost:8095"
+                    echo "Testing deployed application..."
 
                     curl -f http://localhost:8095
 
                     echo ""
 
-                    echo "Application responded successfully."
+                    echo "Checking running container..."
 
-                    echo "======================================"
-                    echo "        DEPLOYED IMAGE"
-                    echo "======================================"
+                    docker ps --filter name=devops-app-jenkins
 
-                    docker inspect ${DEPLOY_CONTAINER} \
+                    echo ""
+
+                    echo "Checking deployed image..."
+
+                    docker inspect devops-app-jenkins \
                         --format '{{.Config.Image}}'
+
+                    echo ""
 
                     echo "======================================"
                     echo "  APPLICATION DEPLOYMENT SUCCESSFUL"
@@ -353,7 +281,7 @@ pipeline {
 
                     echo "Currently deployed image:"
 
-                    CURRENT_IMAGE=$(docker inspect ${DEPLOY_CONTAINER} \
+                    CURRENT_IMAGE=$(docker inspect devops-app-jenkins \
                         --format '{{.Config.Image}}')
 
                     echo "$CURRENT_IMAGE"
@@ -394,20 +322,16 @@ pipeline {
                     done
 
                     echo "======================================"
-                    echo "      REMAINING APPLICATION IMAGES"
+                    echo "Remaining Application Images"
                     echo "======================================"
 
                     docker images ${IMAGE_NAME}
 
                     echo "======================================"
-                    echo "        DOCKER DISK USAGE"
+                    echo "Docker Disk Usage"
                     echo "======================================"
 
                     docker system df
-
-                    echo "======================================"
-                    echo "        CLEANUP COMPLETE"
-                    echo "======================================"
                 '''
             }
         }
@@ -420,9 +344,6 @@ pipeline {
             echo "   CI/CD PIPELINE SUCCESSFUL"
             echo "======================================"
 
-            echo "Build Number:"
-            echo "${BUILD_NUMBER}"
-
             echo "Deployment Mode:"
             echo "${DEPLOY_MODE}"
 
@@ -431,10 +352,6 @@ pipeline {
 
             echo "Application:"
             echo "http://192.168.71.128:8095"
-
-            echo "======================================"
-            echo "       ALL STAGES PASSED"
-            echo "======================================"
         }
 
         failure {
@@ -442,15 +359,7 @@ pipeline {
             echo "      CI/CD PIPELINE FAILED"
             echo "======================================"
 
-            echo "Build Number:"
-            echo "${BUILD_NUMBER}"
-
-            echo "Deployment Mode:"
-            echo "${DEPLOY_MODE}"
-
             echo "Check Console Output for details."
-
-            echo "======================================"
         }
 
         always {
@@ -463,8 +372,6 @@ pipeline {
 
             echo "Deployment Mode:"
             echo "${DEPLOY_MODE}"
-
-            echo "======================================"
         }
     }
 }
