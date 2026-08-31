@@ -1,5 +1,20 @@
 pipeline {
 
+    parameters {
+
+        choice(
+            name: 'DEPLOY_MODE',
+            choices: ['NORMAL', 'ROLLBACK'],
+            description: 'Select NORMAL for CI/CD deployment or ROLLBACK for an older Docker image'
+        )
+
+        string(
+            name: 'ROLLBACK_VERSION',
+            defaultValue: '3',
+            description: 'Docker image version to deploy during rollback'
+        )
+    }
+
     agent any
 
     environment {
@@ -43,6 +58,10 @@ pipeline {
 
                     docker build \
                         -t ${IMAGE_NAME}:${IMAGE_TAG} .
+
+                    echo "Docker image built successfully."
+
+                    docker images ${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
         }
@@ -90,9 +109,15 @@ pipeline {
         stage('Docker Logout') {
             steps {
                 sh '''
+                    echo "======================================"
+                    echo "        DOCKER LOGOUT"
+                    echo "======================================"
+
                     echo "Logging out from Docker Hub..."
 
                     docker logout
+
+                    echo "Docker logout successful."
                 '''
             }
         }
@@ -104,6 +129,27 @@ pipeline {
                     echo "        DEPLOY APPLICATION"
                     echo "======================================"
 
+                    if [ "$DEPLOY_MODE" = "ROLLBACK" ]; then
+
+                        DEPLOY_TAG="$ROLLBACK_VERSION"
+
+                        echo "Deployment Mode: ROLLBACK"
+                        echo "Rollback Version: $DEPLOY_TAG"
+
+                    else
+
+                        DEPLOY_TAG="$IMAGE_TAG"
+
+                        echo "Deployment Mode: NORMAL"
+                        echo "Build Version: $DEPLOY_TAG"
+
+                    fi
+
+                    echo "======================================"
+                    echo "Image to Deploy:"
+                    echo "${IMAGE_NAME}:${DEPLOY_TAG}"
+                    echo "======================================"
+
                     echo "Stopping old container..."
 
                     docker rm -f devops-app-jenkins 2>/dev/null || true
@@ -113,12 +159,14 @@ pipeline {
                     docker run -d \
                         --name devops-app-jenkins \
                         -p 8095:8080 \
-                        ${IMAGE_NAME}:${IMAGE_TAG}
+                        ${IMAGE_NAME}:${DEPLOY_TAG}
 
                     echo "Container started."
 
-                    echo ""
-                    echo "Running containers:"
+                    echo "======================================"
+                    echo "Running Container:"
+                    echo "======================================"
+
                     docker ps --filter name=devops-app-jenkins
                 '''
             }
@@ -140,6 +188,7 @@ pipeline {
                     curl -f http://localhost:8095
 
                     echo ""
+
                     echo "======================================"
                     echo "  APPLICATION DEPLOYMENT SUCCESSFUL"
                     echo "======================================"
@@ -155,6 +204,9 @@ pipeline {
             echo "   CI/CD PIPELINE SUCCESSFUL"
             echo "======================================"
 
+            echo "Deployment Mode:"
+            echo "${DEPLOY_MODE}"
+
             echo "Docker Image:"
             echo "${IMAGE_NAME}:${IMAGE_TAG}"
 
@@ -168,6 +220,15 @@ pipeline {
             echo "======================================"
 
             echo "Check Console Output for details."
+        }
+
+        always {
+            echo "======================================"
+            echo "       PIPELINE COMPLETED"
+            echo "======================================"
+
+            echo "Build Number:"
+            echo "${BUILD_NUMBER}"
         }
     }
 }
