@@ -34,7 +34,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: devops-app-config
-
+            - secretRef:
+                name: devops-app-secret
           resources:
             requests:
               cpu: "100m"
