@@ -31,6 +31,9 @@ spec:
 
           ports:
             - containerPort: 8080
+          volumeMounts:
+            - name: devops-app-storage
+              mountPath: /data
           envFrom:
             - configMapRef:
                 name: devops-app-config
@@ -61,3 +64,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 3
+      volumes:
+        - name: devops-app-storage
+          persistentVolumeClaim:
+            claimName: devops-app-pvc
